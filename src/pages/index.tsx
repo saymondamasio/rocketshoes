@@ -1,49 +1,77 @@
-import type { NextPage } from 'next'
-import { useRouter } from 'next/router'
+import { NextPage } from 'next'
+import React, { useEffect, useState } from 'react'
+import { MdAddShoppingCart } from 'react-icons/md'
+import { useCart } from '../hooks/useCart'
 import { api } from '../services/api'
+import { ProductList } from '../styles/pages/home.styles'
+import { formatPrice } from '../utils/format'
+
+interface Product {
+  id: number
+  title: string
+  price: number
+  image: string
+}
+
+interface ProductFormatted extends Product {
+  priceFormatted: string
+}
+
+interface CartItemsAmount {
+  [key: number]: number
+}
 
 const Home: NextPage = () => {
-  const router = useRouter()
+  const [products, setProducts] = useState<ProductFormatted[]>([])
+  const { addProduct, cart } = useCart()
 
-  async function handleClick() {
-   await  api.post('/orders', {
-	"cart": [
-		{
-			"product_id": "454fb7f2-4c5c-4465-9e7e-be3abd46e5bb",
-			"quantity": 1,
-			"unit_price": 5.60
-		}
-	],
-	"delivery": {
-		"address": {
-			"street": "Rua",
-			"number": "Numero",
-			"neighborhood": "Bairro",
-			"city": "Braga",
-			"state": "PA",
-			"zip_code": "37800000"
-		},
-		"deadline": "2022-02-26",
-		"cost": 11610,
-		"type": "SEDEX"
-	},
-	"payment": {
-		"amount": 1000,
-		"status": "PENDING"
-	}
-    }, {
-      params: {
-        store_id: 'f933715e-f646-4b9d-aa7a-3a2f5c677b9d'
-      }
-    })
+  const cartItemsAmount = cart.reduce((sumAmount, product) => {
+    sumAmount[product.id] = product.amount
 
-    router.push('/payment')
+    return sumAmount
+  }, {} as CartItemsAmount)
+
+  useEffect(() => {
+    async function loadProducts() {
+      const response = await api.get<Product[]>('products')
+
+      const products = response.data.map<ProductFormatted>(product => ({
+        ...product,
+        priceFormatted: formatPrice(product.price),
+      }))
+
+      setProducts(products)
+    }
+
+    loadProducts()
+  }, [])
+
+  async function handleAddProduct(id: number) {
+    await addProduct(id)
   }
 
   return (
-    <div>
-      <button onClick={handleClick}>Fazer pedido</button>
-    </div>
+    <ProductList>
+      {products.map(product => (
+        <li key={product.id}>
+          <img src={product.image} alt={product.title} />
+          <strong>{product.title}</strong>
+          <span>{product.priceFormatted}</span>
+          <button
+            type="button"
+            data-testid="add-product-button"
+            onClick={() => handleAddProduct(product.id)}
+          >
+            <div data-testid="cart-product-quantity">
+              <MdAddShoppingCart size={16} color="#FFF" />
+              {cartItemsAmount[product.id] || 0}
+            </div>
+
+            <span>ADICIONAR AO CARRINHO</span>
+          </button>
+        </li>
+      ))}
+    </ProductList>
   )
 }
 
