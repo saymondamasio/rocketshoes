@@ -6,42 +6,61 @@ import {
   MdRemoveCircleOutline,
 } from 'react-icons/md'
 import { useCart } from '../hooks/useCart'
-import { Container, ProductTable, Total } from '../styles/pages/cart.styles'
+import {
+  Container,
+  ProductTable,
+  Shipping,
+  Total,
+} from '../styles/pages/cart.styles'
+import { CartItem } from '../types'
 import { formatPrice } from '../utils/format'
 
-interface Product {
-  id: number
-  title: string
-  price: number
-  image: string
-  amount: number
-}
-
 const Cart: NextPage = () => {
-  const { cart, removeProduct, updateProductAmount } = useCart()
+  const {
+    cart,
+    removeProduct,
+    updateProductAmount,
+    calculateShipping,
+    delivery,
+    zipCode,
+    setZipCode,
+  } = useCart()
 
-  const cartFormatted = cart.map(product => ({
-    ...product,
-    priceFormatted: formatPrice(product.price),
-    subTotal: formatPrice(product.price * product.amount),
+  const cartFormatted = cart.map(cartItem => ({
+    ...cartItem,
+    subTotal: formatPrice(cartItem.product.price * cartItem.quantity),
+    product: {
+      ...cartItem.product,
+      priceFormatted: formatPrice(cartItem.product.price),
+    },
   }))
   const total = formatPrice(
-    cart.reduce((sumTotal, product) => {
-      sumTotal += product.price * product.amount
+    cart.reduce((sumTotal, cartItem) => {
+      sumTotal += cartItem.product.price * cartItem.quantity
       return sumTotal
     }, 0)
   )
 
-  function handleProductIncrement(product: Product) {
-    updateProductAmount({ productId: product.id, amount: product.amount + 1 })
+  function handleCartItemIncrement(cartItem: CartItem) {
+    updateProductAmount({
+      productId: cartItem.product.id,
+      amount: cartItem.quantity + 1,
+    })
   }
 
-  function handleProductDecrement(product: Product) {
-    updateProductAmount({ productId: product.id, amount: product.amount - 1 })
+  function handleCartItemDecrement(cartItem: CartItem) {
+    updateProductAmount({
+      productId: cartItem.product.id,
+      amount: cartItem.quantity - 1,
+    })
   }
 
   function handleRemoveProduct(productId: number) {
     removeProduct(productId)
+  }
+
+  async function handleCalculateShipping() {
+    calculateShipping(zipCode)
   }
 
   return (
@@ -57,22 +76,25 @@ const Cart: NextPage = () => {
           </tr>
         </thead>
         <tbody>
-          {cartFormatted.map(product => (
-            <tr data-testid="product" key={product.id}>
+          {cartFormatted.map(cartItem => (
+            <tr data-testid="product" key={cartItem.product.id}>
               <td>
-                <img src={product.image} alt={product.title} />
+                <img
+                  src={cartItem.product.photos_url[0]}
+                  alt={cartItem.product.title}
+                />
               </td>
               <td>
-                <strong>{product.title}</strong>
-                <span>{product.priceFormatted}</span>
+                <strong>{cartItem.product.title}</strong>
+                <span>{cartItem.product.priceFormatted}</span>
               </td>
               <td>
                 <div>
                   <button
                     type="button"
                     data-testid="decrement-product"
-                    disabled={product.amount <= 1}
-                    onClick={() => handleProductDecrement(product)}
+                    disabled={cartItem.quantity <= 1}
+                    onClick={() => handleCartItemDecrement(cartItem)}
                   >
                     <MdRemoveCircleOutline size={20} />
                   </button>
@@ -80,25 +102,25 @@ const Cart: NextPage = () => {
                     type="text"
                     data-testid="product-amount"
                     readOnly
-                    value={product.amount}
+                    value={cartItem.quantity}
                   />
                   <button
                     type="button"
                     data-testid="increment-product"
-                    onClick={() => handleProductIncrement(product)}
+                    onClick={() => handleCartItemIncrement(cartItem)}
                   >
                     <MdAddCircleOutline size={20} />
                   </button>
                 </div>
               </td>
               <td>
-                <strong>{product.subTotal}</strong>
+                <strong>{cartItem.subTotal}</strong>
               </td>
               <td>
                 <button
                   type="button"
                   data-testid="remove-product"
-                  onClick={() => handleRemoveProduct(product.id)}
+                  onClick={() => handleRemoveProduct(cartItem.product.id)}
                 >
                   <MdDelete size={20} />
                 </button>
@@ -109,12 +131,40 @@ const Cart: NextPage = () => {
       </ProductTable>
 
       <footer>
-        <button type="button">Finalizar pedido</button>
+        <div>
+          <Shipping>
+            {cart.length > 0 && (
+              <>
+                <input
+                  type="text"
+                  name="cep"
+                  placeholder="CEP"
+                  onChange={e => setZipCode(e.target.value)}
+                  value={zipCode}
+                />
+                <button type="button" onClick={handleCalculateShipping}>
+                  Calcular
+                </button>
+              </>
+            )}
+          </Shipping>
 
-        <Total>
-          <span>TOTAL</span>
-          <strong>{total}</strong>
-        </Total>
+          <Total>
+            {delivery.cost_delivery && cart.length > 0 ? (
+              <div>
+                <span>Frete</span>
+                <strong>{delivery.costFormatted}</strong>
+              </div>
+            ) : (
+              <></>
+            )}
+            <div>
+              <span>TOTAL</span>
+              <strong className="price">{total}</strong>
+            </div>
+          </Total>
+        </div>
+        <button type="button">Finalizar pedido</button>
       </footer>
     </Container>
   )

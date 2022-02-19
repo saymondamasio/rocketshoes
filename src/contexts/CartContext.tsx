@@ -1,6 +1,10 @@
-import { createContext, ReactNode, useState } from 'react'
+import { createContext, ReactNode } from 'react'
+import { toast } from 'react-toastify'
+import { v4 } from 'uuid'
+import { usePersistedState } from '../hooks/usePersistedState'
 import { api } from '../services/api'
-import { Product } from '../types'
+import { CartItem } from '../types'
+import { formatPrice } from '../utils/format'
 
 interface CartProviderProps {
   children: ReactNode
@@ -11,89 +15,103 @@ interface UpdateProductAmount {
   amount: number
 }
 
+interface Delivery {
+  zip_code: string
+  cost_delivery: number
+  deadline: Date
+  costFormatted: string
+}
+
 interface CartContextData {
-  cart: Product[]
+  cart: CartItem[]
+  zipCode: string
+  delivery: Delivery
   addProduct: (productId: number) => Promise<void>
   removeProduct: (productId: number) => void
   updateProductAmount: ({ productId, amount }: UpdateProductAmount) => void
+  calculateShipping: (zipCode: string) => Promise<void>
+  setZipCode: (zipCode: string) => void
 }
 
 export const CartContext = createContext<CartContextData>({} as CartContextData)
 
 export function CartProvider({ children }: CartProviderProps): JSX.Element {
-  const [cart, setCart] = useState<Product[]>(() => {
-    const storeyedCart = localStorage.getItem('@RocketShoes:cart')
-
-    if (storeyedCart) {
-      return JSON.parse(storeyedCart)
-    }
-
-    return []
-  })
+  const [cart, setCart] = usePersistedState<CartItem[]>('@RocketShoes:cart', [])
+  const [delivery, setDelivery] = usePersistedState<Delivery>(
+    '@RocketShoes:delivery',
+    {} as Delivery
+  )
+  const [zipCode, setZipCode] = usePersistedState<string>(
+    '@RocketShoes:zipCode',
+    ''
+  )
 
   const addProduct = async (productId: number) => {
     try {
-      const productExist = cart.find(product => product.id === productId)
+      const cartItemExist = cart.find(
+        cartItem => cartItem.product.id === productId
+      )
 
-      const currentAmount = productExist ? productExist.amount : 0
+      const currentQuantity = cartItemExist ? cartItemExist.quantity : 0
 
-      const responseStock = await api.get(`stock/${productId}`)
+      const responseStock = await api.get(`/products/${productId}/stock`)
 
-      const haveStock = responseStock.data.amount >= currentAmount + 1
+      const haveStock = responseStock.data.stock >= currentQuantity + 1
 
       if (!haveStock) {
-        // toast.error('Quantidade solicitada fora de estoque')
+        toast.error('Quantidade solicitada fora de estoque')
         return
       }
 
-      if (productExist) {
-        const newCart = cart.map(product => {
-          if (product.id === productId) {
+      if (cartItemExist) {
+        const newCart = cart.map(cartItem => {
+          if (cartItem.product.id === productId) {
             return {
-              ...product,
-              amount: product.amount + 1,
+              ...cartItem,
+              quantity: cartItem.quantity + 1,
             }
           }
 
-          return product
+          return cartItem
         })
 
         setCart(newCart)
-        localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart))
       } else {
-        const productResponse = await api.get(`products/${productId}`)
+        const productResponse = await api.get(`/products/${productId}`)
         const productApi = productResponse.data
+        console.log(productApi)
 
         const newCart = [
           ...cart,
           {
-            ...productApi,
-            amount: 1,
+            id: v4(),
+            product: productApi,
+            quantity: 1,
           },
         ]
 
         setCart(newCart)
-        localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart))
       }
     } catch {
-      // toast.error('Erro na adição do produto')
+      toast.error('Erro na adição do produto')
     }
   }
 
   const removeProduct = (productId: number) => {
     try {
-      const productIndex = cart.findIndex(product => product.id === productId)
+      const cartItemIndex = cart.findIndex(
+        cartItem => cartItem.product.id === productId
+      )
       const newCart = [...cart]
-      if (productIndex >= 0) {
-        newCart.splice(productIndex, 1)
+      if (cartItemIndex >= 0) {
+        newCart.splice(cartItemIndex, 1)
       } else {
         throw new Error('')
       }
 
       setCart(newCart)
-      localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart))
     } catch {
-      // toast.error('Erro na remoção do produto')
+      toast.error('Erro na remoção do produto')
     }
   }
 
@@ -107,32 +125,76 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
       }
 
       const newCart = [...cart]
-      const productExists = newCart.find(product => product.id === productId)
+      const cartItemExists = newCart.find(
+        carItem => carItem.product.id === productId
+      )
 
-      if (!productExists) {
+      if (!cartItemExists) {
         throw new Error()
       }
 
-      const stockResponse = await api.get(`/stock/${productId}`)
-      const haveStock = stockResponse.data.amount >= amount
+      const stockResponse = await api.get(`/products/${productId}/stock`)
+      const haveStock = stockResponse.data.stock >= amount
 
       if (!haveStock) {
-        // toast.error('Quantidade solicitada fora de estoque')
+        toast.error('Quantidade solicitada fora de estoque')
         return
       }
 
-      productExists.amount = amount
+      cartItemExists.quantity = amount
 
       setCart(newCart)
-      localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart))
     } catch {
-      // toast.error('Erro na alteração de quantidade do produto')
+      toast.error('Erro na alteração de quantidade do produto')
+    }
+  }
+
+  const calculateShipping = async () => {
+    try {
+      const cartParsed = cart.map(cartItem => ({
+        product_id: cartItem.product.id,
+        quantity: cartItem.quantity,
+      }))
+
+      const response = await api.post<any[] | any>('/deliveries/calculate/', {
+        zip_code: zipCode,
+        cart: cartParsed,
+      })
+
+      if (response.data.error) {
+        toast.error(response.data.error)
+        return
+      }
+
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        const optionDelivery = response.data.find(
+          option => option.type === 'PAC'
+        )
+
+        setDelivery({
+          zip_code: zipCode,
+          cost_delivery: optionDelivery.cost,
+          deadline: new Date(optionDelivery.deadline),
+          costFormatted: formatPrice(optionDelivery.cost / 100),
+        })
+      }
+    } catch {
+      toast.error('Erro na busca de entrega')
     }
   }
 
   return (
     <CartContext.Provider
-      value={{ cart, addProduct, removeProduct, updateProductAmount }}
+      value={{
+        cart,
+        addProduct,
+        removeProduct,
+        updateProductAmount,
+        delivery,
+        calculateShipping,
+        zipCode,
+        setZipCode,
+      }}
     >
       {children}
     </CartContext.Provider>

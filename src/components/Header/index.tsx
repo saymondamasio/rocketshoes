@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import React from 'react'
 import { MdShoppingBasket } from 'react-icons/md'
-import logo from '../../assets/images/logo.svg'
 import { useCart } from '../../hooks/useCart'
 import { Cart, Container } from './styles'
 
@@ -11,12 +10,14 @@ export const Header = (): JSX.Element => {
 
   return (
     <Container>
-      <Link href="/">
-        <img src={logo} alt="Rocketshoes" />
+      <Link href="/" passHref>
+        <a>
+          <img src="assets/logo.svg" alt="Rocketshoes" />
+        </a>
       </Link>
 
-      <Cart href="/cart">
-        <a>
+      <Link href="/cart" passHref>
+        <Cart>
           <div>
             <strong>Meu carrinho</strong>
             <span data-testid="cart-size">
@@ -24,8 +25,8 @@ export const Header = (): JSX.Element => {
             </span>
           </div>
           <MdShoppingBasket size={36} color="#FFF" />
-        </a>
-      </Cart>
+        </Cart>
+      </Link>
     </Container>
   )
 }

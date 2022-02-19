@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import styled from 'styled-components'
 
 export const Container = styled.header`
@@ -16,7 +15,7 @@ export const Container = styled.header`
   }
 `
 
-export const Cart = styled(Link)`
+export const Cart = styled.a`
   display: flex;
   align-items: center;
   text-decoration: none;

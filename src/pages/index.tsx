@@ -4,29 +4,24 @@ import { MdAddShoppingCart } from 'react-icons/md'
 import { useCart } from '../hooks/useCart'
 import { api } from '../services/api'
 import { ProductList } from '../styles/pages/home.styles'
+import { Product } from '../types'
 import { formatPrice } from '../utils/format'
-
-interface Product {
-  id: number
-  title: string
-  price: number
-  image: string
-}
 
 interface ProductFormatted extends Product {
   priceFormatted: string
 }
 
 interface CartItemsAmount {
-  [key: number]: number
+  [key: string]: number
 }
 
 const Home: NextPage = () => {
   const [products, setProducts] = useState<ProductFormatted[]>([])
+
   const { addProduct, cart } = useCart()
 
-  const cartItemsAmount = cart.reduce((sumAmount, product) => {
-    sumAmount[product.id] = product.amount
+  const cartItemsAmount = cart.reduce((sumAmount, cartItem) => {
+    sumAmount[cartItem.product.id] = cartItem.quantity
 
     return sumAmount
   }, {} as CartItemsAmount)
@@ -54,7 +49,7 @@ const Home: NextPage = () => {
     <ProductList>
       {products.map(product => (
         <li key={product.id}>
-          <img src={product.image} alt={product.title} />
+          <img src={product.photos_url[0]} alt={product.title} />
           <strong>{product.title}</strong>
           <span>{product.priceFormatted}</span>
           <button

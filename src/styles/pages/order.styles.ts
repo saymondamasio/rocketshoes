@@ -1,10 +1,12 @@
 import { darken, lighten } from 'polished'
 import styled from 'styled-components'
 
-export const Container = styled.div`
-  padding: 30px;
+export const Container = styled.div``
+
+export const ContainerInfoCart = styled.div`
   background: #fff;
   border-radius: 4px;
+  padding: 0 30px;
 
   footer {
     margin-top: 30px;
@@ -98,10 +100,8 @@ export const ProductTable = styled.table`
 `
 
 export const Total = styled.div`
-  div {
-    display: flex;
-    align-items: baseline;
-  }
+  display: flex;
+  align-items: baseline;
 
   span {
     color: #999;
@@ -109,14 +109,7 @@ export const Total = styled.div`
   }
 
   strong {
-    font-size: 16px;
-    margin-left: 5px;
-  }
-
-  strong.price {
-    font-size: 22px;
+    font-size: 28px;
     margin-left: 5px;
   }
 `
-
-export const Shipping = styled.div``
