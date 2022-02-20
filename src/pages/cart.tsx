@@ -1,4 +1,5 @@
 import { NextPage } from 'next'
+import { useRouter } from 'next/router'
 import React from 'react'
 import {
   MdAddCircleOutline,
@@ -16,12 +17,14 @@ import { CartItem } from '../types'
 import { formatPrice } from '../utils/format'
 
 const Cart: NextPage = () => {
+  const router = useRouter()
+
   const {
     cart,
     removeProduct,
     updateProductAmount,
     calculateShipping,
-    delivery,
+    shipping,
     zipCode,
     setZipCode,
   } = useCart()
@@ -150,10 +153,10 @@ const Cart: NextPage = () => {
           </Shipping>
 
           <Total>
-            {delivery.cost_delivery && cart.length > 0 ? (
+            {shipping.cost && cart.length > 0 ? (
               <div>
                 <span>Frete</span>
-                <strong>{delivery.costFormatted}</strong>
+                <strong>{shipping.costFormatted}</strong>
               </div>
             ) : (
               <></>
@@ -164,7 +167,9 @@ const Cart: NextPage = () => {
             </div>
           </Total>
         </div>
-        <button type="button">Finalizar pedido</button>
+        <button type="button" onClick={() => router.push('order')}>
+          Finalizar pedido
+        </button>
       </footer>
     </Container>
   )

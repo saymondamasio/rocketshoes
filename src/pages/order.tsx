@@ -5,6 +5,8 @@ import {
   MdDelete,
   MdRemoveCircleOutline,
 } from 'react-icons/md'
+import { InfoPayment } from '../components/InfoPayment'
+import { InfoShipping } from '../components/InfoShipping'
 import { useCart } from '../hooks/useCart'
 import {
   Container,
@@ -16,7 +18,8 @@ import { CartItem } from '../types'
 import { formatPrice } from '../utils/format'
 
 const Order: NextPage = () => {
-  const { cart, removeProduct, updateProductAmount } = useCart()
+  const { cart, removeProduct, updateProductAmount, shipping, order } =
+    useCart()
 
   const cartFormatted = cart.map(cartItem => ({
     ...cartItem,
@@ -121,11 +124,27 @@ const Order: NextPage = () => {
 
         <footer>
           <Total>
-            <span>TOTAL</span>
-            <strong>{total}</strong>
+            {shipping.cost && cart.length > 0 ? (
+              <div>
+                <span>Frete</span>
+                <strong>{shipping.costFormatted}</strong>
+              </div>
+            ) : (
+              <></>
+            )}
+            <div>
+              <span>TOTAL</span>
+              <strong className="price">{total}</strong>
+            </div>
           </Total>
         </footer>
       </ContainerInfoCart>
+
+      <div>
+        <InfoShipping />
+
+        {order.id && <InfoPayment />}
+      </div>
     </Container>
   )
 }

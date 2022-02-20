@@ -13,6 +13,16 @@ export const Container = styled.header`
       opacity: 0.7;
     }
   }
+
+  > div {
+    display: flex;
+    gap: 10px;
+    button {
+      background: transparent;
+      font-size: 0;
+      border: none;
+    }
+  }
 `
 
 export const Cart = styled.a`

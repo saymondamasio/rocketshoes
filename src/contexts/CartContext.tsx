@@ -2,7 +2,7 @@ import { createContext, ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import { v4 } from 'uuid'
 import { usePersistedState } from '../hooks/usePersistedState'
-import { api } from '../services/api'
+import { api } from '../services/api-client'
 import { CartItem } from '../types'
 import { formatPrice } from '../utils/format'
 
@@ -15,31 +15,54 @@ interface UpdateProductAmount {
   amount: number
 }
 
-interface Delivery {
+interface Address {
+  zipCode: string
+  street: string
+  number: string
+  complement?: string
+  city: string
+  state: string
+}
+
+interface Shipping {
   zip_code: string
-  cost_delivery: number
+  cost: number
   deadline: Date
   costFormatted: string
+  address?: Address
+}
+
+interface Order {
+  id?: string
+  cart: CartItem[]
+  shipping: Shipping
 }
 
 interface CartContextData {
   cart: CartItem[]
+  order: Order
   zipCode: string
-  delivery: Delivery
+  shipping: Shipping
   addProduct: (productId: number) => Promise<void>
   removeProduct: (productId: number) => void
   updateProductAmount: ({ productId, amount }: UpdateProductAmount) => void
   calculateShipping: (zipCode: string) => Promise<void>
   setZipCode: (zipCode: string) => void
+  addShippingAddress: (address: Address) => void
+  createOrder: () => Promise<void>
 }
 
 export const CartContext = createContext<CartContextData>({} as CartContextData)
 
 export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const [cart, setCart] = usePersistedState<CartItem[]>('@RocketShoes:cart', [])
-  const [delivery, setDelivery] = usePersistedState<Delivery>(
-    '@RocketShoes:delivery',
-    {} as Delivery
+  const [shipping, setShipping] = usePersistedState<Shipping>(
+    '@RocketShoes:shipping',
+    {} as Shipping
+  )
+  const [order, setOrder] = usePersistedState<Order>(
+    '@RocketShoes:order',
+    {} as Order
   )
   const [zipCode, setZipCode] = usePersistedState<string>(
     '@RocketShoes:zipCode',
@@ -156,7 +179,7 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
         quantity: cartItem.quantity,
       }))
 
-      const response = await api.post<any[] | any>('/deliveries/calculate/', {
+      const response = await api.post<any[] | any>('/shipments/calculate/', {
         zip_code: zipCode,
         cart: cartParsed,
       })
@@ -167,20 +190,50 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
       }
 
       if (Array.isArray(response.data) && response.data.length > 0) {
-        const optionDelivery = response.data.find(
+        const optionShipping = response.data.find(
           option => option.type === 'PAC'
         )
 
-        setDelivery({
+        setShipping({
           zip_code: zipCode,
-          cost_delivery: optionDelivery.cost,
-          deadline: new Date(optionDelivery.deadline),
-          costFormatted: formatPrice(optionDelivery.cost / 100),
+          cost: optionShipping.cost,
+          deadline: new Date(optionShipping.deadline),
+          costFormatted: formatPrice(optionShipping.cost / 100),
         })
       }
     } catch {
       toast.error('Erro na busca de entrega')
     }
+  }
+
+  const addShippingAddress = (address: Address) => {
+    setShipping({
+      ...shipping,
+      address,
+    })
+  }
+
+  const createOrder = async () => {
+    const orderApi = await api.post('/orders', {
+      cart: cart.map(cartItem => ({
+        product_id: cartItem.product.id,
+        quantity: cartItem.quantity,
+      })),
+      shipping: {
+        address: shipping.address,
+        deadline: shipping.deadline,
+        cost: shipping.cost,
+        type: 'PAC',
+      },
+      payment: {
+        amount:
+          cart.reduce((accumulator, cartItem) => {
+            const productSubtotal = cartItem.product.price * cartItem.quantity
+            return accumulator + productSubtotal
+          }, 0) + shipping.cost,
+      },
+    })
+    console.log(orderApi)
   }
 
   return (
@@ -190,10 +243,13 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
         addProduct,
         removeProduct,
         updateProductAmount,
-        delivery,
+        shipping,
         calculateShipping,
         zipCode,
         setZipCode,
+        addShippingAddress,
+        createOrder,
+        order,
       }}
     >
       {children}
